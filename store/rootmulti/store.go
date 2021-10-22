@@ -1,6 +1,7 @@
 package rootmulti
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/pokt-network/pocket-core/store/cachemulti"
 	"github.com/pokt-network/pocket-core/store/iavl"
@@ -10,64 +11,92 @@ import (
 
 // Prefixed abstractions living inside AppDB;
 type Store struct {
-	appDB     dbm.DB      // parent db, (where everything lives except for state)
-	state     dbm.DB      // ephemeral state used to 'stage' potential changes; only latest height; nuked on startup;
+	//deletionStmts []*sql.Stmt
+	//sqlDB         *sql.DB
+	//appDB         dbm.DB      // parent db, (where everything lives except for state)
+	//state         dbm.DB      // ephemeral state used to 'stage' potential changes; only latest height; nuked on startup
+	appIAVLDB dbm.DB // iavl exclusive db (where everything lives except for state)
+	asdb      *AppStateDB
+	masdb     *MutableAppStateDB
 	iavl      *iavl.Store // used for latest height state commitments ONLY; may be pruned;
-	storeKey  string      // constant; part of the prefix
-	height    int64       // dynamic; part of the prefix
 	isMutable bool        // !isReadOnly
+	height    int64       // dynamic; part of the prefix
+	storeKey  string      // constant; part of the prefix
 }
 
-func NewStore(appDB dbm.DB, height int64, storeKey string, commitID types.CommitID, stateDir string, isMutable bool) *Store {
+func NewStore(appIAVLDB dbm.DB, height int64, storeKey string, commitID types.CommitID, stateDir string, isMutable bool, asdb *AppStateDB) *Store {
 	store := &Store{
-		appDB:     appDB,
-		storeKey:  storeKey,
+		appIAVLDB: appIAVLDB,
 		isMutable: isMutable,
 		height:    height,
+		storeKey:  storeKey,
 	}
 	if isMutable {
-		// load height-1 into state from AppDB
-		prefix := StoreKey(height-1, storeKey, "")
-		it, err := appDB.Iterator(prefix, types.PrefixEndBytes(prefix))
-		if err != nil {
-			panic(fmt.Sprintf("unable to create an iterator for height %d storeKey %s", height, storeKey))
-		}
-		defer it.Close()
-		store.state, err = dbm.NewGoLevelDB(storeKey, stateDir)
-		if err != nil {
-			panic(err)
-		}
-		for ; it.Valid(); it.Next() {
-			err := store.state.Set(KeyFromStoreKey(it.Key()), it.Value())
-			if err != nil {
-				panic("unable to set k/v in state: " + err.Error())
-			}
-		}
 		// load IAVL from AppDB
-		store.iavl, err = iavl.LoadStore(dbm.NewPrefixDB(appDB, []byte("s/k:"+storeKey+"/")), commitID, false)
+		iavlStore, err := iavl.LoadStore(dbm.NewPrefixDB(appIAVLDB, []byte("s/k:"+storeKey+"/")), commitID, false)
 		if err != nil {
-			panic("unable to load iavlStore in rootmultistore: " + err.Error())
+			panic("unable to load iavlStore in store: " + err.Error())
 		}
+		store.iavl = iavlStore
+
+		// Create a new mutable app state to operate on
+		masdb, masdbErr := NewMutableAppStateDB(asdb)
+		if masdbErr != nil {
+			panic("Unable to initialize mutable state app db in store: " + masdbErr.Error())
+		}
+		store.masdb = masdb
 	}
+	//if isMutable {
+	//	// load height-1 into state from AppDB
+	//	prefix := StoreKey(height-1, storeKey, "")
+	//	it, err := appDB.Iterator(prefix, types.PrefixEndBytes(prefix))
+	//	if err != nil {
+	//		panic(fmt.Sprintf("unable to create an iterator for height %d storeKey %s", height, storeKey))
+	//	}
+	//	defer it.Close()
+	//	store.state, err = dbm.NewGoLevelDB(storeKey, stateDir)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	for ; it.Valid(); it.Next() {
+	//		err := store.state.Set(KeyFromStoreKey(it.Key()), it.Value())
+	//		if err != nil {
+	//			panic("unable to set k/v in state: " + err.Error())
+	//		}
+	//	}
+	//	// load IAVL from AppDB
+	//	store.iavl, err = iavl.LoadStore(dbm.NewPrefixDB(appDB, []byte("s/k:"+storeKey+"/")), commitID, false)
+	//	if err != nil {
+	//		panic("unable to load iavlStore in rootmultistore: " + err.Error())
+	//	}
+	//}
+	//fmt.Println(sqlite3.SQLITE_OK)
+	//database, dbError := sql.Open("sqlite3", "/Users/luyzdeleon/current_projects/pocket-datadirs/waves/app.db")
+	//if dbError != nil {
+	//	fmt.Println(dbError)
+	//}
+	//database.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (height NUMBER, keyvalue TEXT, value TEXT, deletedat NUMBER, PRIMARY KEY (height, keyvalue))", storeKey))
+	//store.sqlDB = database
+	//store.deletionStmts = []*sql.Stmt{}
 	return store
 }
 
 func (is *Store) LoadImmutableVersion(version int64, stateDir string) *Store {
-	return NewStore(is.appDB, version, is.storeKey, types.CommitID{}, stateDir, false)
+	return NewStore(is.appIAVLDB, version, is.storeKey, types.CommitID{}, stateDir, false, is.asdb)
 }
 
 func (is *Store) Get(key []byte) ([]byte, error) {
 	if is.isMutable { // if latestHeight
-		return is.state.Get(key)
+		return is.masdb.Get(is.height, is.storeKey, string(key))
 	}
-	return is.appDB.Get(StoreKey(is.height-1, is.storeKey, string(key)))
+	return is.asdb.Get(is.height - 1, is.storeKey, string(key))
 }
 
 func (is *Store) Has(key []byte) (bool, error) {
 	if is.isMutable { // if latestHeight
-		return is.state.Has(key)
+		return is.masdb.Has(is.height, is.storeKey, string(key))
 	}
-	return is.appDB.Has(StoreKey(is.height-1, is.storeKey, string(key)))
+	return is.asdb.Has(is.height-1, is.storeKey, string(key))
 }
 
 func (is *Store) Set(key, value []byte) error {
@@ -76,7 +105,7 @@ func (is *Store) Set(key, value []byte) error {
 		if err != nil {
 			panic("unable to set to iavl: " + err.Error())
 		}
-		return is.state.Set(key, value)
+		return is.masdb.Set(is.height, is.storeKey, string(key), string(value))
 	}
 	panic("'Set()' called on immutable store")
 }
@@ -87,7 +116,7 @@ func (is *Store) Delete(key []byte) error {
 		if err != nil {
 			panic("unable to delete to iavl: " + err.Error())
 		}
-		return is.state.Delete(key)
+		return is.masdb.Delete(is.height, is.storeKey, string(key))
 	}
 	panic("'Delete()' called on immutable store")
 }
@@ -120,6 +149,38 @@ func (is *Store) CommitBatch(b dbm.Batch) (commitID types.CommitID, batch dbm.Ba
 	defer it.Close()
 	for ; it.Valid(); it.Next() {
 		b.Set(StoreKey(is.height, is.storeKey, string(it.Key())), it.Value())
+
+		// Insert into SQL db
+		// key := string(StoreKey(is.height, is.storeKey, string(it.Key())))
+		height := is.height + 1
+		storekey := is.storeKey
+		keyvalue := string(it.Key())
+		queryStmt, _ := is.sqlDB.Prepare(fmt.Sprintf("SELECT MAX(height), value, deletedat FROM %s WHERE keyvalue = ?", storekey))
+		rows, _ := queryStmt.Query(keyvalue)
+		var maxHeight sql.NullInt64
+		var latestValue sql.NullString
+		var deletedat sql.NullInt64
+		for rows.Next() {
+			rows.Scan(&maxHeight, &latestValue, &deletedat)
+		}
+
+		// If the latest value is null OR the latest value is different than the value being written OR deleted at != null
+		if !latestValue.Valid || latestValue.String != string(it.Value()) || deletedat.Valid {
+			// Insert the record because the value changed or doesn't exist
+			statement, _ := is.sqlDB.Prepare(fmt.Sprintf("INSERT OR REPLACE INTO %s (height, keyvalue, value, deletedat) VALUES (?, ?, ?, ?)", storekey))
+			statement.Exec(height, keyvalue, string(it.Value()), sql.NullInt64{})
+		}
+
+		// Process deletions
+		for i := 0; i < len(is.deletionStmts); i++ {
+			deletionStmt := is.deletionStmts[i]
+			if deletionStmt != nil {
+				deletionStmt.Exec()
+			}
+		}
+
+		// Reinitialize deletions slice
+		is.deletionStmts = []*sql.Stmt{}
 	}
 	is.height++
 	return commitID, b
@@ -187,38 +248,38 @@ func KeyFromStoreKey(storeKey []byte) (key []byte) {
 	panic("attempted to get key from store key that doesn't have exactly 2 delims")
 }
 
-var _ dbm.Iterator = AppDBIterator{}
-
-// Is 'height/storeKey' aware
-type AppDBIterator struct {
-	it dbm.Iterator
-}
-
-func (s AppDBIterator) Key() (key []byte) {
-	return KeyFromStoreKey(s.it.Key())
-}
-
-func (s AppDBIterator) Valid() bool {
-	return s.it.Valid()
-}
-
-func (s AppDBIterator) Next() {
-	s.it.Next()
-}
-
-func (s AppDBIterator) Value() (value []byte) {
-	return s.it.Value()
-}
-
-func (s AppDBIterator) Error() error {
-	return s.it.Error()
-}
-
-func (s AppDBIterator) Close() {
-	s.it.Close()
-}
-
-func (s AppDBIterator) Domain() (start []byte, end []byte) {
-	st, end := s.it.Domain()
-	return KeyFromStoreKey(st), KeyFromStoreKey(end)
-}
+//var _ dbm.Iterator = AppDBIterator{}
+//
+//// Is 'height/storeKey' aware
+//type AppDBIterator struct {
+//	it dbm.Iterator
+//}
+//
+//func (s AppDBIterator) Key() (key []byte) {
+//	return KeyFromStoreKey(s.it.Key())
+//}
+//
+//func (s AppDBIterator) Valid() bool {
+//	return s.it.Valid()
+//}
+//
+//func (s AppDBIterator) Next() {
+//	s.it.Next()
+//}
+//
+//func (s AppDBIterator) Value() (value []byte) {
+//	return s.it.Value()
+//}
+//
+//func (s AppDBIterator) Error() error {
+//	return s.it.Error()
+//}
+//
+//func (s AppDBIterator) Close() {
+//	s.it.Close()
+//}
+//
+//func (s AppDBIterator) Domain() (start []byte, end []byte) {
+//	st, end := s.it.Domain()
+//	return KeyFromStoreKey(st), KeyFromStoreKey(end)
+//}

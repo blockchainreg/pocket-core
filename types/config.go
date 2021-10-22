@@ -76,7 +76,7 @@ const (
 	DefaultTxIndexTags                 = "tx.hash,tx.height,message.sender,transfer.recipient"
 	ConfigDirName                      = "config"
 	ConfigFileName                     = "config.json"
-	ApplicationDBName                  = "application"
+	ApplicationIAVLDBName              = "application-iavl"
 	TransactionIndexerDBName           = "txindexer"
 	PlaceholderHash                    = "0001"
 	PlaceholderURL                     = "http://127.0.0.1:8081"
@@ -138,7 +138,7 @@ func DefaultConfig(dataDir string) Config {
 	c.TendermintConfig.LogLevel = "*:info, *:error"
 	c.TendermintConfig.TxIndex.Indexer = DefaultTxIndexer
 	c.TendermintConfig.TxIndex.IndexKeys = DefaultTxIndexTags
-	c.TendermintConfig.DBBackend = string(db.GoLevelDBBackend)
+	c.TendermintConfig.DBBackend = string(db.SQLiteBackend)
 	c.TendermintConfig.RPC.GRPCMaxOpenConnections = 2500
 	c.TendermintConfig.RPC.MaxOpenConnections = 2500
 	c.TendermintConfig.Mempool.Size = 9000

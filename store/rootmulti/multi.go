@@ -18,6 +18,7 @@ import (
 var _ types.CommitMultiStore = (*MultiStore)(nil)
 
 const stateDBFolder = "app-state"
+const applicationDBName = "application-state.db"
 
 type MultiStore struct {
 	AppDB        dbm.DB                               // application db, contains everything but the state
@@ -25,14 +26,20 @@ type MultiStore struct {
 	stores       map[types.StoreKey]types.CommitStore // prefixed abstractions; living inside appDB
 	lastCommitID types.CommitID                       // lastCommitID from the IAVL
 	pruneDepth   int64                                // -1 is off
+	AppStateDB   *AppStateDB
 }
 
 func NewMultiStore(appDB dbm.DB, datadir string, pruneDepth int64) *MultiStore {
+	appStateDB, err := NewAppStateDB(applicationDBName, datadir)
+	if err != nil {
+		panic(err)
+	}
 	return &MultiStore{
 		AppDB:      appDB,
-		stateDir:   datadir + string(filepath.Separator) + stateDBFolder,
+		stateDir:   datadir + string(filepath.Separator),
 		stores:     make(map[types.StoreKey]types.CommitStore),
 		pruneDepth: pruneDepth,
+		AppStateDB: appStateDB,
 	}
 }
 
