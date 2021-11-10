@@ -37,6 +37,7 @@ func StartRPC(port string, timeout int64, simulation bool, debug bool) {
 		routes = append(routes, Route{Name: "DebugTrace", Method: "GET", Path: "/debug/pprof/trace", HandlerFunc: wrapperHandlerFunc(pprof.Trace)})
 		routes = append(routes, Route{Name: "FreeOsMemory", Method: "GET", Path: "/debug/freememory", HandlerFunc: FreeMemory})
 		routes = append(routes, Route{Name: "MemStats", Method: "GET", Path: "/debug/memstats", HandlerFunc: MemStats})
+		routes = append(routes, Route{Name: "Health", Method: "GET", Path: "/debug/health", HandlerFunc: HealthMetrics})
 	}
 
 	srv := &http.Server{
@@ -159,7 +160,9 @@ func WriteJSONResponse(w http.ResponseWriter, jsn, path, ip string) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	err := json.NewEncoder(w).Encode(raw)
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	err := enc.Encode(raw)
 	if err != nil {
 		fmt.Println(fmt.Errorf("error in RPC Handler WriteJSONResponse: %v", err))
 		return
