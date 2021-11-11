@@ -6,6 +6,7 @@ import (
 	sdk "github.com/pokt-network/pocket-core/types"
 	"math/big"
 	"net/http"
+	"strconv"
 
 	types2 "github.com/pokt-network/pocket-core/x/auth/types"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -76,7 +77,16 @@ type PaginatedHeightAndAddrParams struct {
 }
 
 func HealthMetrics(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	res, err := app.PCA.QueryHealthMetrics()
+	height := int64(0)
+	keys, ok := r.URL.Query()["height"]
+	if ok && len(keys[0]) >= 1 {
+		i, err := strconv.ParseInt(keys[0], 10, 64)
+		if err != nil {
+			panic(err)
+		}
+		height = i
+	}
+	res, err := app.PCA.QueryHealthMetrics(height)
 	if err != nil {
 		WriteErrorResponse(w, 400, err.Error())
 		return
