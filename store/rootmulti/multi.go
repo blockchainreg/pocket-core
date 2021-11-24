@@ -2,6 +2,7 @@ package rootmulti
 
 import (
 	"fmt"
+	sqlite "github.com/mattn/go-sqlite3"
 	"github.com/pokt-network/pocket-core/codec"
 	reg "github.com/pokt-network/pocket-core/codec/types"
 	"github.com/pokt-network/pocket-core/store/cachemulti"
@@ -11,48 +12,43 @@ import (
 	"github.com/tendermint/tendermint/crypto/merkle"
 	"github.com/tendermint/tendermint/crypto/tmhash"
 	dbm "github.com/tendermint/tm-db"
-	"os"
 	"path/filepath"
 )
 
 var _ types.CommitMultiStore = (*MultiStore)(nil)
 
-const stateDBFolder = "app-state"
-const applicationDBName = "application-state.db"
+const dataFolder = "data"
+//const applicationDBName = "application-state"
 
 type MultiStore struct {
 	AppDB        dbm.DB                               // application db, contains everything but the state
-	stateDir     string                               // path to statedb folder
+	StateDir     string                               // path to statedb folder
 	stores       map[types.StoreKey]types.CommitStore // prefixed abstractions; living inside appDB
 	lastCommitID types.CommitID                       // lastCommitID from the IAVL
 	pruneDepth   int64                                // -1 is off
-	AppStateDB   *AppStateDB
 }
 
 func NewMultiStore(appDB dbm.DB, datadir string, pruneDepth int64) *MultiStore {
-	appStateDB, err := NewAppStateDB(applicationDBName, datadir)
-	if err != nil {
-		panic(err)
-	}
+	fmt.Println(sqlite.SQLITE_OK)
+	stateDir := datadir + string(filepath.Separator) + dataFolder
 	return &MultiStore{
 		AppDB:      appDB,
-		stateDir:   datadir + string(filepath.Separator),
+		StateDir:   stateDir,
 		stores:     make(map[types.StoreKey]types.CommitStore),
 		pruneDepth: pruneDepth,
-		AppStateDB: appStateDB,
 	}
 }
 
 // read or write
 func (rs *MultiStore) LoadLatestVersion() error {
 	// nuke the state
-	_ = os.RemoveAll(rs.stateDir)
+	//_ = os.RemoveAll(rs.stateDir)
 	// get latest height
 	latestHeight := getLatestVersion(rs.AppDB)
 	// if genesis
 	if latestHeight == 0 {
 		for key := range rs.stores {
-			store := NewStore(rs.AppDB, latestHeight, key.Name(), types.CommitID{}, rs.stateDir, true)
+			store := NewStore(rs.AppDB, latestHeight, key.Name(), types.CommitID{}, rs.StateDir, true)
 			rs.stores[key] = store
 		}
 		return nil
@@ -70,7 +66,7 @@ func (rs *MultiStore) LoadLatestVersion() error {
 	}
 	// create new mutable store
 	for key := range rs.stores {
-		rs.stores[key] = NewStore(rs.AppDB, latestHeight, key.Name(), infos[key.Name()].Core.CommitID, rs.stateDir, true)
+		rs.stores[key] = NewStore(rs.AppDB, latestHeight, key.Name(), infos[key.Name()].Core.CommitID, rs.StateDir, true)
 	}
 	return nil
 }
@@ -91,7 +87,7 @@ func (rs *MultiStore) LoadImmutableVersion(height int64) (*types.Store, error) {
 	// load immutable from previous stores
 	prevStores := make(map[types.StoreKey]types.CommitStore)
 	for k, store := range rs.stores {
-		prevStores[k] = store.(*Store).LoadImmutableVersion(height, rs.stateDir)
+		prevStores[k] = store.(*Store).LoadImmutableVersion(height, rs.StateDir)
 	}
 	// create struct & return
 	ms := types.Store(&MultiStore{
@@ -118,22 +114,26 @@ func (rs *MultiStore) Commit() types.CommitID {
 	// for each store; CommitBatch() & add CommitID to CommitInfo
 	// if Pruning(); prune height - depth
 	for key, store := range rs.stores {
-		commitID, batch := store.(*Store).CommitBatch(batch)
+		commitID := store.(*Store).Commit()
 		commitInfo.StoreInfos = append(commitInfo.StoreInfos, StoreInfo{
 			Name: key.Name(),
 			Core: StoreCore{
 				CommitID: commitID,
 			},
 		})
+		// Only Prunes IAVL
 		if rs.Pruning() {
-			batch = store.(*Store).PruneVersion(batch, height-rs.pruneDepth)
+			store.(*Store).PruneIAVLVersion(height-rs.pruneDepth)
 		}
 	}
 	// save commitInfo & latestHeight
 	setCommitInfo(batch, height, commitInfo)
 	setLatestVersion(batch, height)
 	// write the batch
-	_ = batch.Write()
+	batchWriteErr := batch.Write()
+	if batchWriteErr != nil {
+		panic(batchWriteErr)
+	}
 	// prep next height
 	rs.lastCommitID = types.CommitID{
 		Version: height,

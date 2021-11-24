@@ -138,7 +138,7 @@ func DefaultConfig(dataDir string) Config {
 	c.TendermintConfig.LogLevel = "*:info, *:error"
 	c.TendermintConfig.TxIndex.Indexer = DefaultTxIndexer
 	c.TendermintConfig.TxIndex.IndexKeys = DefaultTxIndexTags
-	c.TendermintConfig.DBBackend = string(db.SQLiteBackend)
+	c.TendermintConfig.DBBackend = string(db.GoLevelDBBackend)
 	c.TendermintConfig.RPC.GRPCMaxOpenConnections = 2500
 	c.TendermintConfig.RPC.MaxOpenConnections = 2500
 	c.TendermintConfig.Mempool.Size = 9000

@@ -304,6 +304,10 @@ func (k Keeper) ClaimIsMature(ctx sdk.Ctx, sessionBlockHeight int64) bool {
 
 // "DeleteExpiredClaims" - Deletes the expired (claim expiration > # of session passed since claim genesis) claims
 func (k Keeper) DeleteExpiredClaims(ctx sdk.Ctx) {
+	if ctx.BlockHeight() == 73 {
+		fmt.Println("WE'VE REACHED 73")
+	}
+
 	var msg = pc.MsgClaim{}
 	store := ctx.KVStore(k.storeKey)
 	iterator, _ := sdk.KVStorePrefixIterator(store, pc.ClaimKey)
