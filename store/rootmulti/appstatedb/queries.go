@@ -29,21 +29,21 @@ WHERE %s.deleted_at IS NULL OR NOT (%s.deleted_at <= %d)
 
 const InsertStatement = `
 	INSERT OR REPLACE INTO %s(height, key, value)
-	SELECT ?, ?, ?
-	 WHERE ? NOT IN
+	SELECT %d, X'%s', X'%s'
+	 WHERE '%s' NOT IN
 					(
-					 SELECT %s.value
+					 SELECT HEX(%s.value)
 					  FROM %s INNER JOIN (
 						  SELECT height as j_height, key as j_key, deleted_at as j_deleted_at
 						  FROM %s
-						  WHERE key = ? AND
-                                height <= ?
+						  WHERE key = X'%s' AND
+                                height <= %d
 						  GROUP BY height
 						  HAVING height = MAX(height)
 						  ORDER BY height DESC
 						  LIMIT 1
 						  ) ON %s.height = j_height AND %s.key = j_key
-					WHERE %s.deleted_at IS NULL OR NOT (%s.deleted_at <= ?)
+					WHERE %s.deleted_at IS NULL OR NOT (%s.deleted_at <= %d)
 				   )
 `
 

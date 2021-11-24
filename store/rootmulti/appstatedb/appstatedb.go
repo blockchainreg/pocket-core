@@ -247,7 +247,9 @@ func (asdb *AppStateDB) SetMutable(height int64, table string, key, value []byte
 	}
 
 	// Execute the insert statement
-	result, insertExecErr := tx.Exec(fmt.Sprintf(InsertStatement, table, table, table, table, table, table, table, table), height, key, value, value, key, height, height)
+	hexKey := strings.ToUpper(hex.EncodeToString(key))
+	hexValue := strings.ToUpper(hex.EncodeToString(value))
+	result, insertExecErr := tx.Exec(logAndReturn(fmt.Sprintf(InsertStatement, table, height, hexKey, hexValue, hexValue, table, table, table, hexKey, height, table, table, table, table ,height)))
 	if insertExecErr != nil {
 		return insertExecErr
 	}
