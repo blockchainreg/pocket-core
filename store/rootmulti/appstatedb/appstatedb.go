@@ -171,7 +171,7 @@ func (asdb *AppStateDB) HasMutable(height int64, table string, key []byte) (bool
 //}
 
 func logAndReturn(log string) string {
-	//fmt.Println(strings.ReplaceAll(log, "\n", " "))
+	fmt.Println(strings.ReplaceAll(log, "\n", " "))
 	return log
 }
 
