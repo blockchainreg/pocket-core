@@ -12,10 +12,11 @@ package appstatedb
 //  ORDER BY height DESC
 //     LIMIT 1`
 
+//language=SQL
 const GetQuery = `
 SELECT %s.value
   FROM %s INNER JOIN (
-      SELECT height as j_height, key as j_key, deleted_at as j_deleted_at
+      SELECT height as j_height, key as j_key
       FROM %s
       WHERE key = X'%s' AND
             height <= %d
@@ -27,6 +28,7 @@ SELECT %s.value
 WHERE %s.deleted_at IS NULL OR NOT (%s.deleted_at <= %d)
 `
 
+//language=SQL
 const InsertStatement = `
 	INSERT OR REPLACE INTO %s(height, key, value)
 	SELECT %d, X'%s', X'%s'
@@ -34,7 +36,7 @@ const InsertStatement = `
 					(
 					 SELECT HEX(%s.value)
 					  FROM %s INNER JOIN (
-						  SELECT height as j_height, key as j_key, deleted_at as j_deleted_at
+						  SELECT height as j_height, key as j_key
 						  FROM %s
 						  WHERE key = X'%s' AND
                                 height <= %d
@@ -47,13 +49,14 @@ const InsertStatement = `
 				   )
 `
 
+//language=SQL
 const DeleteStatement = `
   UPDATE %s
      SET deleted_at = %d
    WHERE (key, height) IN (
 					SELECT %s.key, %s.height
 					  FROM %s INNER JOIN (
-						  SELECT height as j_height, key as j_key, deleted_at as j_deleted_at
+						  SELECT height as j_height, key as j_key
 						    FROM %s
 						   WHERE key = X'%s' AND
                                 height <= %d
@@ -65,17 +68,17 @@ const DeleteStatement = `
 					WHERE %s.deleted_at IS NULL OR NOT (%s.deleted_at <= %d)
    )
 `
-
+//language=SQL
 const IteratorQuery = `
 SELECT key, value
   FROM %s
  WHERE (key, height) IN (
 	SELECT %s.key, %s.height
 	  FROM %s INNER JOIN (
-		SELECT height as j_height, key as j_key, deleted_at as j_deleted_at
+		SELECT height as j_height, key as j_key
 		  FROM %s
 		 WHERE height <= %d AND
-               HEX(key) LIKE '%s%%' AND
+               HEX(key) >= '%s' AND
                HEX(key) < '%s'
       GROUP BY key
         HAVING height = MAX(height)
@@ -86,13 +89,14 @@ SELECT key, value
 ORDER BY key %s
 `
 
+//language=SQL
 const IteratorAllQuery = `
 SELECT key, value
   FROM %s
  WHERE (key, height) IN (
 	SELECT %s.key, %s.height
 	  FROM %s INNER JOIN (
-		SELECT height as j_height, key as j_key, deleted_at as j_deleted_at
+		SELECT height as j_height, key as j_key
 		  FROM %s
 		 WHERE height <= %d
       GROUP BY key
