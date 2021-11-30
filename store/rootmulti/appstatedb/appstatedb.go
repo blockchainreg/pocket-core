@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	sqlite "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 	dbm "github.com/tendermint/tm-db"
 	"strings"
 	"sync"
@@ -24,7 +23,7 @@ type AppStateDB struct {
 
 func NewAppStateDB(dir string, table string) (*AppStateDB, error) {
 	// Find a way to not have to do this
-	fmt.Println(sqlite.SQLITE_OK)
+	//fmt.Println(sqlite.SQLITE_OK)
 	// Create the db connection
 	db, dbError := getDBConn(dir, table) //sql.Open("sqlite3", fmt.Sprintf("file:%s/%s.db?cache=shared&_mutex=full", dir, table))
 	if dbError != nil {
@@ -171,7 +170,7 @@ func (asdb *AppStateDB) HasMutable(height int64, table string, key []byte) (bool
 //}
 
 func logAndReturn(log string) string {
-	fmt.Println(strings.ReplaceAll(log, "\n", " "))
+	//fmt.Println(strings.ReplaceAll(log, "\n", " "))
 	return log
 }
 
@@ -186,19 +185,21 @@ func (asdb *AppStateDB) GetMutable(height int64, table string, key []byte) ([]by
 		return nil, txErr
 	}
 
-	// Prepare the query
-	hexKey := strings.ToUpper(hex.EncodeToString(key))
+
 	//queryStmtStr := //
 	//fmt.Println(strings.ReplaceAll(queryStmtStr, "\n", " "))
-	queryStmt, queryStmtErr := tx.Prepare(logAndReturn(fmt.Sprintf(GetQuery, table, table, table, hexKey, height, table, table, table, table, height)))
-	if queryStmtErr != nil {
-		return nil, queryStmtErr
-	}
-	defer queryStmt.Close()
+	//queryStmt, queryStmtErr := tx.Prepare(logAndReturn(fmt.Sprintf(GetQuery, table, table, table, hexKey, height, table, table, table, table, height)))
+	//if queryStmtErr != nil {
+	//	return nil, queryStmtErr
+	//}
+	//defer queryStmt.Close()
+
+	// Prepare the query
+	hexKey := strings.ToUpper(hex.EncodeToString(key))
 
 	// Execute the query
 	var result string
-	queryError := queryStmt.QueryRow().Scan(&result)
+	queryError := tx.QueryRow(logAndReturn(fmt.Sprintf(GetQuery, table, table, table, hexKey, height, table, table, table, table, height))).Scan(&result)
 	// Check for empty result
 	if queryError == sql.ErrNoRows {
 		return nil, nil
@@ -249,19 +250,19 @@ func (asdb *AppStateDB) SetMutable(height int64, table string, key, value []byte
 	// Execute the insert statement
 	hexKey := strings.ToUpper(hex.EncodeToString(key))
 	hexValue := strings.ToUpper(hex.EncodeToString(value))
-	result, insertExecErr := tx.Exec(logAndReturn(fmt.Sprintf(InsertStatement, table, height, hexKey, hexValue, hexValue, table, table, table, hexKey, height, table, table, table, table ,height)))
+	_, insertExecErr := tx.Exec(logAndReturn(fmt.Sprintf(InsertStatement, table, height, hexKey, hexValue, hexValue, table, table, table, hexKey, height, table, table, table, table ,height)))
 	if insertExecErr != nil {
 		return insertExecErr
 	}
 
-	rowsAff, rowsAffErr := result.RowsAffected()
-	if rowsAffErr != nil {
-		panic(rowsAffErr.Error())
-	}
-
-	if rowsAff > 1 {
-		return errors.New(fmt.Sprintf("Affected rows on set > 1 %d", rowsAff))
-	}
+	//rowsAff, rowsAffErr := result.RowsAffected()
+	//if rowsAffErr != nil {
+	//	panic(rowsAffErr.Error())
+	//}
+	//
+	//if rowsAff > 1 {
+	//	return errors.New(fmt.Sprintf("Affected rows on set > 1 %d", rowsAff))
+	//}
 
 	// Success!
 	return nil
@@ -311,27 +312,29 @@ func (asdb *AppStateDB) DeleteMutable(height int64, table string, key []byte) er
 	}
 
 	// Prepare the delete statement
-	hexKey := strings.ToUpper(hex.EncodeToString(key))
-	deleteStmt, deleteStmtErr := tx.Prepare(logAndReturn(fmt.Sprintf(DeleteStatement, table, height, table, table, table, table, hexKey, height, table, table, table, table, height)))
-	if deleteStmtErr != nil {
-		return deleteStmtErr
-	}
-	defer deleteStmt.Close()
+	// hexKey := strings.ToUpper(hex.EncodeToString(key))
+	//deleteStmt, deleteStmtErr := tx.Prepare(logAndReturn(fmt.Sprintf(DeleteStatement, table, height, table, table, table, table, hexKey, height, table, table, table, table, height)))
+	//if deleteStmtErr != nil {
+	//	return deleteStmtErr
+	//}
+	//defer deleteStmt.Close()
 
+	// Prepare the delete statement
+	hexKey := strings.ToUpper(hex.EncodeToString(key))
 	// Execute the delete statement
-	delResult, deleteExecErr := deleteStmt.Exec()
+	_, deleteExecErr := tx.Exec(logAndReturn(fmt.Sprintf(DeleteStatement, table, height, table, table, table, table, hexKey, height, table, table, table, table, height)))
 	if deleteExecErr != nil {
 		return deleteExecErr
 	}
 
-	delResultRowsAffected, delResultRowsAffectedErr := delResult.RowsAffected()
-	if delResultRowsAffectedErr != nil {
-		return delResultRowsAffectedErr
-	}
-
-	if delResultRowsAffected > 1 {
-		return errors.New(fmt.Sprintf("Affected rows on delete != 1 %d", delResultRowsAffected))
-	}
+	//delResultRowsAffected, delResultRowsAffectedErr := delResult.RowsAffected()
+	//if delResultRowsAffectedErr != nil {
+	//	return delResultRowsAffectedErr
+	//}
+	//
+	//if delResultRowsAffected > 1 {
+	//	return errors.New(fmt.Sprintf("Affected rows on delete != 1 %d", delResultRowsAffected))
+	//}
 
 	// Success!
 	return nil
@@ -374,14 +377,14 @@ func (asdb *AppStateDB) iteratorMutableSorted(height int64, table string, start,
 		iteratorQueryStr = fmt.Sprintf(IteratorQuery, table, table, table, table, table, height, hexStart, hexEnd, table, table, table, table, height, order.String())
 	}
 
-	queryStmt, queryStmtErr := tx.Prepare(logAndReturn(iteratorQueryStr))
-	if queryStmtErr != nil {
-		return nil, queryStmtErr
-	}
-	defer queryStmt.Close()
+	//queryStmt, queryStmtErr := tx.Prepare(logAndReturn(iteratorQueryStr))
+	//if queryStmtErr != nil {
+	//	return nil, queryStmtErr
+	//}
+	//defer queryStmt.Close()
 
 	// Execute the query
-	rows, queryError := queryStmt.Query()
+	rows, queryError := tx.Query(logAndReturn(iteratorQueryStr))
 	if queryError != nil {
 		return nil, queryError
 	}
