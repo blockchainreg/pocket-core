@@ -40,8 +40,6 @@ const InsertStatement = `
 						  FROM %s
 						  WHERE key = X'%s' AND
                                 height <= %d
-						  GROUP BY height
-						  HAVING height = MAX(height)
 						  ORDER BY height DESC
 						  LIMIT 1
 						  ) ON %s.height = j_height AND %s.key = j_key
@@ -133,7 +131,5 @@ ORDER BY key %s
 
 const createTableStatement = `
 CREATE TABLE IF NOT EXISTS %s (height NUMBER NOT NULL, key BLOB, value BLOB, deleted_at NUMBER, PRIMARY KEY (height, key));
-CREATE INDEX IF NOT EXISTS idx_%s_height_key_deleted_at ON %s (height, key, deleted_at);
-CREATE INDEX IF NOT EXISTS idx_%s_height_deleted_at ON %s (height, deleted_at);
 `
 
