@@ -9,6 +9,7 @@ import (
 	"github.com/pokt-network/pocket-core/store/rootmulti/appstatedb"
 	"github.com/pokt-network/pocket-core/store/types"
 	dbm "github.com/tendermint/tm-db"
+	"log"
 )
 
 // Prefixed abstractions living inside AppDB;
@@ -28,7 +29,7 @@ func NewStore(appIAVLDB dbm.DB, height int64, storeKey string, commitID types.Co
 		isMutable: isMutable,
 		height:    height,
 		storeKey:  storeKey,
-		isDebug:   true,
+		isDebug:   false,
 	}
 
 	// load IAVL from AppDB
@@ -135,10 +136,6 @@ func (is *Store) Set(key, value []byte) error {
 // Deletes both from the iavl and asdb
 func (is *Store) Delete(key []byte) error {
 	if is.isMutable {
-		if is.height == 73 {
-			fmt.Println("WE'VE REACHED 73")
-		}
-
 		err := is.iavl.Delete(key)
 		if err != nil {
 			panic("unable to delete to iavl: " + err.Error())
@@ -311,6 +308,11 @@ func (is *Store) Commit() types.CommitID {
 	}
 	// Increase the version of the store
 	is.height++
+
+	if is.height >= 360 {
+		log.Fatal("TELMINAMO")
+		//panic("TELMINAMO")
+	}
 
 	return commitID
 }

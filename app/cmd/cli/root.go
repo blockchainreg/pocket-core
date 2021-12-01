@@ -81,7 +81,13 @@ var startCmd = &cobra.Command{
 	},
 }
 
+func timeTrack(start time.Time, name string) {
+	elapsed := time.Since(start)
+	fmt.Println(fmt.Sprintf("%s took %s", name, elapsed))
+}
+
 func start(cmd *cobra.Command, args []string) {
+	log.Println("Start")
 	var genesisType app.GenesisType
 	if mainnet && testnet {
 		fmt.Println("cannot run with mainnet and testnet genesis simultaneously, please choose one")

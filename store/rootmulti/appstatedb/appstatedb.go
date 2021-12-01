@@ -9,6 +9,7 @@ import (
 	dbm "github.com/tendermint/tm-db"
 	"strings"
 	"sync"
+	"time"
 )
 
 var dbConnMap = map[string]*sql.DB{}
@@ -31,7 +32,7 @@ func NewAppStateDB(dir string, table string) (*AppStateDB, error) {
 	}
 
 	// Create the table if not exists
-	_, tableCreationError := db.Exec(fmt.Sprintf(createTableStatement, table, table, table, table, table))
+	_, tableCreationError := db.Exec(fmt.Sprintf(createTableStatement, table))
 	if tableCreationError != nil {
 		return nil, tableCreationError
 	}
@@ -48,7 +49,7 @@ func NewAppStateDB(dir string, table string) (*AppStateDB, error) {
 func getTx(dir, table string) (*sql.Tx, error) {
 	var result = txMap[table]
 	if result == nil {
-		db, dbErr := getDBConn(dir, table)//sql.Open("sqlite3", fmt.Sprintf("file:%s/%s.db?cache=shared&_mutex=full", dir, table))
+		db, dbErr := getDBConn(dir, table) //sql.Open("sqlite3", fmt.Sprintf("file:%s/%s.db?cache=shared&_mutex=full", dir, table))
 		if dbErr != nil {
 			return nil, dbErr
 		}
@@ -82,7 +83,7 @@ func getDBConn(dir, table string) (*sql.DB, error) {
 
 // Has interface
 func (asdb *AppStateDB) Has(height int64, table string, key []byte) (bool, error) {
-	//defer timeTrack(time.Now(), "Has")
+	defer timeTrack(time.Now(), "Has")
 	//asdb.mu.Lock()
 	////defer asdb.mu.Unlock()
 
@@ -109,7 +110,7 @@ func (asdb *AppStateDB) Has(height int64, table string, key []byte) (bool, error
 }
 
 func (asdb *AppStateDB) HasMutable(height int64, table string, key []byte) (bool, error) {
-	//defer timeTrack(time.Now(), "Has Mutable")
+	defer timeTrack(time.Now(), fmt.Sprintf("Has Mutable %s", table))
 	//asdb.mu.Lock()
 	//defer asdb.mu.Unlock()
 
@@ -143,7 +144,7 @@ func (asdb *AppStateDB) HasMutable(height int64, table string, key []byte) (bool
 
 // Get interface
 //func (asdb *AppStateDB) Get(height int64, table string, key []byte) ([]byte, error) {
-//	//defer timeTrack(time.Now(), "Get")
+//	defer timeTrack(time.Now(), "Get")
 //	//asdb.mu.Lock()
 //	//defer asdb.mu.Unlock()
 //
@@ -170,12 +171,12 @@ func (asdb *AppStateDB) HasMutable(height int64, table string, key []byte) (bool
 //}
 
 func logAndReturn(log string) string {
-	//fmt.Println(strings.ReplaceAll(log, "\n", " "))
+	fmt.Println(strings.ReplaceAll(log, "\n", " "))
 	return log
 }
 
 func (asdb *AppStateDB) GetMutable(height int64, table string, key []byte) ([]byte, error) {
-	//defer timeTrack(time.Now(), "Get Mutable")
+	defer timeTrack(time.Now(), fmt.Sprintf("Get Mutable %s", table))
 	//asdb.mu.Lock()
 	//defer asdb.mu.Unlock()
 
@@ -184,7 +185,6 @@ func (asdb *AppStateDB) GetMutable(height int64, table string, key []byte) ([]by
 	if txErr != nil {
 		return nil, txErr
 	}
-
 
 	//queryStmtStr := //
 	//fmt.Println(strings.ReplaceAll(queryStmtStr, "\n", " "))
@@ -213,7 +213,7 @@ func (asdb *AppStateDB) GetMutable(height int64, table string, key []byte) ([]by
 
 // Set interface
 //func (asdb *AppStateDB) Set(height int64, table string, key []byte, value []byte) error {
-//	//defer timeTrack(time.Now(), "Set")
+//	defer timeTrack(time.Now(), "Set")
 //	//asdb.mu.Lock()
 //	//defer asdb.mu.Unlock()
 //
@@ -237,7 +237,7 @@ func (asdb *AppStateDB) GetMutable(height int64, table string, key []byte) ([]by
 //}
 
 func (asdb *AppStateDB) SetMutable(height int64, table string, key, value []byte) error {
-	//defer timeTrack(time.Now(), "Set Mutable")
+	defer timeTrack(time.Now(), fmt.Sprintf("Set Mutable %s", table))
 	//asdb.mu.Lock()
 	//defer asdb.mu.Unlock()
 
@@ -250,7 +250,7 @@ func (asdb *AppStateDB) SetMutable(height int64, table string, key, value []byte
 	// Execute the insert statement
 	hexKey := strings.ToUpper(hex.EncodeToString(key))
 	hexValue := strings.ToUpper(hex.EncodeToString(value))
-	_, insertExecErr := tx.Exec(logAndReturn(fmt.Sprintf(InsertStatement, table, height, hexKey, hexValue, hexValue, table, table, table, hexKey, height, table, table, table, table ,height)))
+	_, insertExecErr := tx.Exec(logAndReturn(fmt.Sprintf(InsertStatement, table, height, hexKey, hexValue, hexValue, table, table, table, hexKey, height, table, table, table, table, height)))
 	if insertExecErr != nil {
 		return insertExecErr
 	}
@@ -270,7 +270,7 @@ func (asdb *AppStateDB) SetMutable(height int64, table string, key, value []byte
 
 // Delete interface
 //func (asdb *AppStateDB) Delete(height int64, table string, key []byte) error {
-//	//defer timeTrack(time.Now(), "Delete")
+//	defer timeTrack(time.Now(), "Delete")
 //	//asdb.mu.Lock()
 //	//defer asdb.mu.Unlock()
 //
@@ -302,7 +302,7 @@ func (asdb *AppStateDB) SetMutable(height int64, table string, key, value []byte
 //}
 
 func (asdb *AppStateDB) DeleteMutable(height int64, table string, key []byte) error {
-	//defer timeTrack(time.Now(), "Delete")
+	defer timeTrack(time.Now(), fmt.Sprintf("Delete Mutable %s", table))
 	//asdb.mu.Lock()
 	//defer asdb.mu.Unlock()
 
@@ -358,7 +358,7 @@ func (itor iteratorOrder) String() string {
 }
 
 func (asdb *AppStateDB) iteratorMutableSorted(height int64, table string, start, end []byte, order iteratorOrder) (dbm.Iterator, error) {
-	//defer timeTrack(time.Now(), "iteratorSorted Immutable")
+	defer timeTrack(time.Now(), fmt.Sprintf("Iterator Mutable %s with order %s", table, order.String()))
 	//asdb.mu.Lock()
 	//defer asdb.mu.Unlock()
 
@@ -394,7 +394,7 @@ func (asdb *AppStateDB) iteratorMutableSorted(height int64, table string, start,
 }
 
 //func (asdb *AppStateDB) iteratorSorted(height int64, table string, start, end []byte, order iteratorOrder) (dbm.Iterator, error) {
-//	//defer timeTrack(time.Now(), "iteratorSorted Immutable")
+//	defer timeTrack(time.Now(), "iteratorSorted Immutable")
 //	//asdb.mu.Lock()
 //	//defer asdb.mu.Unlock()
 //
@@ -440,7 +440,7 @@ func (asdb *AppStateDB) ReverseIteratorMutable(height int64, table string, start
 }
 
 func (asdb *AppStateDB) CommitMutable() error {
-	//defer timeTrack(time.Now(), "CommitMutable")
+	defer timeTrack(time.Now(), "CommitMutable")
 	//asdb.mu.Lock()
 	//defer asdb.mu.Unlock()
 

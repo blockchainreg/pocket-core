@@ -6,6 +6,6 @@ import (
 )
 
 func timeTrack(start time.Time, name string) {
-	elapsed := time.Since(start)
-	fmt.Println(fmt.Sprintf("%s took %s", name, elapsed))
+	elapsed := time.Since(start).Nanoseconds()
+	fmt.Println(fmt.Sprintf("%s,%d", name, elapsed))
 }
