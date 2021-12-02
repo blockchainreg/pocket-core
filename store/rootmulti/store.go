@@ -29,7 +29,7 @@ func NewStore(appIAVLDB dbm.DB, height int64, storeKey string, commitID types.Co
 		isMutable: isMutable,
 		height:    height,
 		storeKey:  storeKey,
-		isDebug:   false,
+		isDebug:   true,
 	}
 
 	// load IAVL from AppDB
@@ -218,25 +218,25 @@ func (is *Store) Iterator(start, end []byte) (types.Iterator, error) {
 	}
 
 	if is.isDebug {
-		iavlIt, iavlItErr := is.iavl.Iterator(start, end)
+		_, iavlItErr := is.iavl.Iterator(start, end)
 		if iavlItErr != nil {
 			panic("Iavl Iterator error: " + iavlItErr.Error())
 		}
 
-		if !iteratorEquals(iavlIt, result) {
-			fmt.Println(fmt.Sprintf("Different Iterators on height: %d", is.height))
-			fmt.Println(fmt.Sprintf("Different Iterators with start: %s and end: %s", hex.EncodeToString(start), hex.EncodeToString(end)))
-			panic(fmt.Sprintf("Different Iterators on table %s", is.storeKey))
-		}
-
-		// The actual result returned
-		if is.isMutable {
-			// Query the current block from the getmutable
-			result, itErr = is.asdb.IteratorMutable(is.height, is.storeKey, start, end)
-		} else {
-			// Need to query from the block before the store to get immutable results
-			result, itErr = is.asdb.IteratorMutable(is.height - 1, is.storeKey, start, end)
-		}
+		//if !iteratorEquals(iavlIt, result) {
+		//	fmt.Println(fmt.Sprintf("Different Iterators on height: %d", is.height))
+		//	fmt.Println(fmt.Sprintf("Different Iterators with start: %s and end: %s", hex.EncodeToString(start), hex.EncodeToString(end)))
+		//	panic(fmt.Sprintf("Different Iterators on table %s", is.storeKey))
+		//}
+		//
+		//// The actual result returned
+		//if is.isMutable {
+		//	// Query the current block from the getmutable
+		//	result, itErr = is.asdb.IteratorMutable(is.height, is.storeKey, start, end)
+		//} else {
+		//	// Need to query from the block before the store to get immutable results
+		//	result, itErr = is.asdb.IteratorMutable(is.height - 1, is.storeKey, start, end)
+		//}
 	}
 
 	return result, itErr
@@ -255,23 +255,26 @@ func (is *Store) ReverseIterator(start, end []byte) (types.Iterator, error) {
 	}
 
 	if is.isDebug {
-		iavlIt, iavlItErr := is.iavl.ReverseIterator(start, end)
+
+		_, iavlItErr := is.iavl.ReverseIterator(start, end)
 		if iavlItErr != nil {
 			panic("Iavl Iterator error: " + iavlItErr.Error())
 		}
 
-		if !iteratorEquals(iavlIt, result) {
-			panic(fmt.Sprintf("Different Iterators on table %s", is.storeKey))
-		}
-
-		// The actual result returned
-		if is.isMutable {
-			// Query the current block from the getmutable
-			result, itErr = is.asdb.ReverseIteratorMutable(is.height, is.storeKey, start, end)
-		} else {
-			// Need to query from the block before the store to get immutable results
-			result, itErr = is.asdb.ReverseIteratorMutable(is.height - 1, is.storeKey, start, end)
-		}
+		//if !iteratorEquals(iavlIt, result) {
+		//	fmt.Println(fmt.Sprintf("Different Iterators on height: %d", is.height))
+		//	fmt.Println(fmt.Sprintf("Different Iterators with start: %s and end: %s", hex.EncodeToString(start), hex.EncodeToString(end)))
+		//	panic(fmt.Sprintf("Different Iterators on table %s", is.storeKey))
+		//}
+		//
+		//// The actual result returned
+		//if is.isMutable {
+		//	// Query the current block from the getmutable
+		//	result, itErr = is.asdb.ReverseIteratorMutable(is.height, is.storeKey, start, end)
+		//} else {
+		//	// Need to query from the block before the store to get immutable results
+		//	result, itErr = is.asdb.ReverseIteratorMutable(is.height - 1, is.storeKey, start, end)
+		//}
 	}
 
 	return result, itErr
@@ -309,7 +312,7 @@ func (is *Store) Commit() types.CommitID {
 	// Increase the version of the store
 	is.height++
 
-	if is.height >= 360 {
+	if is.height >= 300 {
 		log.Fatal("TELMINAMO")
 		//panic("TELMINAMO")
 	}

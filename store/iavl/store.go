@@ -6,6 +6,7 @@ import (
 	"github.com/pokt-network/pocket-core/store/types"
 	"github.com/tendermint/tendermint/libs/kv"
 	"sync"
+	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 	dbm "github.com/tendermint/tm-db"
@@ -167,6 +168,7 @@ func (st *Store) CacheWrap() types.CacheWrap {
 
 // Implements types.KVStore.
 func (st *Store) Set(key, value []byte) error {
+	defer timeTrack(time.Now(), fmt.Sprintf("Set Mutable IAVL"))
 	if value == nil {
 		panic("value is nil")
 	}
@@ -176,23 +178,27 @@ func (st *Store) Set(key, value []byte) error {
 
 // Implements types.KVStore.
 func (st *Store) Get(key []byte) (value []byte, err error) {
+	defer timeTrack(time.Now(), fmt.Sprintf("Get Mutable IAVL"))
 	_, v := st.tree.Get(key)
 	return v, nil
 }
 
 // Implements types.KVStore.
 func (st *Store) Has(key []byte) (exists bool, err error) {
+	defer timeTrack(time.Now(), fmt.Sprintf("Has Mutable IAVL"))
 	return st.tree.Has(key), nil
 }
 
 // Implements types.KVStore.
 func (st *Store) Delete(key []byte) error {
+	defer timeTrack(time.Now(), fmt.Sprintf("Delete Mutable IAVL"))
 	st.tree.Remove(key)
 	return nil
 }
 
 // Implements types.KVStore.
 func (st *Store) Iterator(start, end []byte) (types.Iterator, error) {
+	defer timeTrack(time.Now(), fmt.Sprintf("Iterator Mutable IAVL with order %s", "ASC"))
 	var iTree *ImmutableTree
 
 	switch tree := st.tree.(type) {
@@ -207,6 +213,7 @@ func (st *Store) Iterator(start, end []byte) (types.Iterator, error) {
 
 // Implements types.KVStore.
 func (st *Store) ReverseIterator(start, end []byte) (types.Iterator, error) {
+	defer timeTrack(time.Now(), fmt.Sprintf("Iterator Mutable IAVL with order %s", "DESC"))
 	var iTree *ImmutableTree
 
 	switch tree := st.tree.(type) {
